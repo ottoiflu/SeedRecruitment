@@ -32,6 +32,14 @@ void enableRawMode() {
 
 }
 
+int get_window_size(int *rows, int *cols) {
+	struct winsize ws;
+	ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
+	*rows = ws.ws_row;
+	*cols = ws.ws_col;
+	return 0; // 成功获取窗口大小，返回0
+}
+int cols, rows;
 int readKey() {
 	int nread ;
 	char c;
@@ -65,7 +73,7 @@ int readKey() {
 				case 'H':
 					//printf("\nHome key pressed.\n");
 					return 1005;
-				case 'F':
+				case 'G':
 					//printf("\nEnd key pressed.\n");
 					return 1006;
 			}
@@ -75,16 +83,9 @@ int readKey() {
 		return c;
 	}
 
-void moveCursor(int x, int y) {
-	char buf[32];
-	int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", y, x);
-	write(STDOUT_FILENO, buf, len); // 将光标移动到指定位置
-}
-
 void adAppend(){
 
 }
-
 
 int main() {
     enableRawMode();
@@ -93,7 +94,7 @@ int main() {
 	write(STDOUT_FILENO,"\x1b[2J", 4);//清屏
 	printf("level2.c程序已启动\n");
 	write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
-	int x = 1,y=1;
+
 	while (1){
 		int key = readKey();
 		if (key == -1) continue;
@@ -127,7 +128,8 @@ int main() {
 			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 1006) {
-			write(STDOUT_FILENO,"\x1b[F", 3);//光标移动到右下角
+			get_window_size(&rows, &cols); // 获取窗口大小
+			write(STDOUT_FILENO,"\x1b[%dG", cols);//光标移动到行尾
 			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 'q') {

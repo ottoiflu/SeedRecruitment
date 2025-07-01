@@ -3,21 +3,28 @@
 #include<fcntl.h>
 #include<sys/ioctl.h>
 #include<stdio.h>
+#include<errno.h>
 
 struct termios orig_termios;//存储终端的当前设置
 
 void disableRawMode(){
 	printf("Exiting raw mode...\n");
 	//raw.c_lflag &= (ECHO);
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);//将原始设置输回终端
+	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) {
+		perror("tcsetattr");
+	}
 }
 
 void enableRawMode() {
-  tcgetattr(STDIN_FILENO, &orig_termios);//获取当前终端设置并存储到orig_termios中
+  if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) {//成功为0，失败为-1
+      perror("tcgetattr");
+  }
   struct termios change = orig_termios;//存储终端的原始设置
   printf("Entering raw mode...\n");
-  tcgetattr(STDIN_FILENO, &change);//读取标准输入终端的属性存储到change中
-  
+  if(tcgetattr(STDIN_FILENO, &change) == -1) {//读取标准输入终端的属性存储到change中
+      perror("tcgetattr");
+  }
+
   change.c_lflag &= ~(ECHO);//修改本地标志字段，关闭回显功能
   change.c_lflag &= ~(ICANON);//关闭规范模式，启用原始模式
   change.c_lflag &= ~(ISIG);//关闭信号处理
@@ -29,7 +36,9 @@ void enableRawMode() {
   change.c_cc[VMIN] = 0; //设置最小输入字符数为0
   change.c_cc[VTIME] = 1; //设置输入等待时间为1
 
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &change);//将修改后的传入标准输入终端
+  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &change) == -1) {//将修改后的传入标准输入终端
+      perror("tcsetattr");
+  }
   //tcsaflush在更改属性前刷新所有的输入输出
 
 }
@@ -50,16 +59,16 @@ int main() {
 		if (seq[1] == '[') {
 			switch (seq[2]) {
 				case 'A':
-					printf("\nUp arrow key pressed.\n");
+					printf("\nKey:PageUp \n");
 					break;
 				case 'B':
-					printf("\nDown arrow key pressed.\n");
+					printf("\nKey:PageDown \n");
 					break;
 				case 'C':
-					printf("\nRight arrow key pressed.\n");
+					printf("\nKey:RightArrow \n");
 					break;
 				case 'D':
-					printf("\nLeft arrow key pressed.\n");
+					printf("\nKey:LeftArrow \n");
 					break;
 			}
 		}
@@ -71,7 +80,7 @@ int main() {
 
 	else  //如果读取到的字符不是'q'，则打印读取的字符
 	{
-		printf("\nRead character: %c\n", c); //打印读取的字符
+		printf("\nKey: %c   ASCII:%d\n", c, c); //打印读取的字符
 	}
 
   }
