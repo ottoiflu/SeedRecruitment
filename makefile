@@ -7,3 +7,10 @@ level1: level1.c
 	$(CC) $(CFLAGS) level1.c -o ./level1
 	@echo "level1 compiled successfully."
 	./level1
+
+.PHONY: level2
+level2: level2.c
+	@echo "Compiling level2..."
+	$(CC) $(CFLAGS) level2.c -o ./level2
+	@echo "level2 compiled successfully."
+	./level2

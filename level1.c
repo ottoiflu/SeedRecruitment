@@ -13,6 +13,7 @@ void disableRawMode(){
 }
 
 void enableRawMode() {
+  tcgetattr(STDIN_FILENO, &orig_termios);//获取当前终端设置并存储到orig_termios中
   struct termios change = orig_termios;//存储终端的原始设置
   printf("Entering raw mode...\n");
   tcgetattr(STDIN_FILENO, &change);//读取标准输入终端的属性存储到change中
