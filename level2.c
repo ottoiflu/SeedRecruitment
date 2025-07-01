@@ -132,14 +132,12 @@ void refresh_screen() {
 	struct appendbuffer ab = APPENDBUFFER_INIT;
 	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
 	bufferappend(&ab, "\x1b[3J", 4); //
-	bufferappend(&ab,"jfjdjsjdkfjfkjdkjdkjflskjdlkfjldkjslkdjfldkjslkdjl\r\n", 62);// 添加一些文本到缓冲区
-	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
-	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
-	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
-	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
 
-	for (int i = 7; i < rows; i++) {
-		bufferappend(&ab, "~\r\n", 3); 
+	for (int i = 0; i < rows; i++) {
+		int filerow = i + rowoff; // 计算实际行号
+		char line[64];
+		int linelen = snprintf(line, sizeof(line), "~ line %d\r\n", filerow);
+		bufferappend(&ab, line, linelen);
 	}
 	
 	char buf[32];
@@ -148,8 +146,7 @@ void refresh_screen() {
 
 	write(STDOUT_FILENO, ab.b, ab.len); // 输出缓冲区内容
 	free(ab.b); // 释放缓冲区
-	// 刷新屏幕的函数
-	// 这里可以添加清屏和光标移动等操作
+
 }
 
 
