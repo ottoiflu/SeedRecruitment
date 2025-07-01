@@ -4,8 +4,34 @@
 #include<sys/ioctl.h>
 #include<stdio.h>
 #include<errno.h>
+#include<string.h>
+#include<stdlib.h>
 
 struct  termios orig_termios;
+
+struct appendbuffer{
+	char *b;
+	int len;
+};
+
+#define APPENDBUFFER_INIT {NULL, 0}
+
+//用于光标定位与视图偏移
+int cy = 0,cx = 0; // 光标x,y坐标
+int rowoff = 0, coloff = 0; // 行偏移和列偏移
+
+void bufferappend(struct appendbuffer *ab, const char *s, int len) {
+	char* new_buffer = realloc(ab->b, ab->len + len);
+	if (!new_buffer) {
+		perror("realloc");
+		exit(1);
+	}
+	ab->b = new_buffer;
+	memcpy(ab->b + ab->len, s, len);//将新数据复制到缓冲区的末尾
+	ab->len += len;
+}
+
+
 
 void disable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
@@ -83,62 +109,126 @@ int readKey() {
 		return c;
 	}
 
-void adAppend(){
-
+void scoll(){
+	// 处理滚动逻辑
+	// 这里可以添加滚动的实现
+	// 例如，当光标到达屏幕底部时，向上滚动一行
+	if (cy < rowoff) {
+		cy = rowoff; // 保持光标在最后一行
+	}
+	if (cy >= rowoff+rows) {
+		rowoff= cy - rows+1; // 向上滚动
+	}
+	if (cx < coloff) {
+		cx = coloff; // 保持光标在最后一列
+	}
+	if (cx >=coloff+cols) {
+		coloff = cx - cols + 1; // 向左滚动
+	}
 }
+
+void refresh_screen() {
+	scoll(); // 调用滚动函数
+	struct appendbuffer ab = APPENDBUFFER_INIT;
+	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
+
+	bufferappend(&ab,"jfjdjsjdkfjfkjdkjdkjflskjdlkfjldkjslkdjfldkjslkdjl\r\n", 62);// 添加一些文本到缓冲区
+	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
+
+	for (int i = 2; i < rows; i++) {
+		bufferappend(&ab, "~\r\n", 3); 
+	}
+	
+	char buf[32];
+	sprintf(buf, "\x1b[%d;%dH", cy -rowoff, cx -coloff); // 光标位置
+	bufferappend(&ab, buf, strlen(buf)); // 添加光标位置到缓冲区
+	
+	write(STDOUT_FILENO, ab.b, ab.len); // 输出缓冲区内容
+	free(ab.b); // 释放缓冲区
+	// 刷新屏幕的函数
+	// 这里可以添加清屏和光标移动等操作
+}
+
+
 
 int main() {
     enableRawMode();
 	atexit(disable_raw_mode); // 在程序退出时恢复原始终端设置
-	write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
-	write(STDOUT_FILENO,"\x1b[2J", 4);//清屏
-	printf("level2.c程序已启动\n");
-	write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
+	
+	struct appendbuffer ab = APPENDBUFFER_INIT;
+	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
+	bufferappend(&ab, "\x1b[2J", 4); // 清屏
+	bufferappend(&ab, "level2.c start\n", 16); // 添加文本到缓冲区
+	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
+	write(STDOUT_FILENO, ab.b, ab.len); // 输出缓冲区内容
+	free(ab.b);
+
 
 	while (1){
+		get_window_size(&rows, &cols); // 获取窗口大小
+		refresh_screen(); // 刷新屏幕
 		int key = readKey();
-		if (key == -1) continue;
+		struct appendbuffer ab = APPENDBUFFER_INIT;
 		
-		else if (key == 1000) {
-			write(STDOUT_FILENO,"\x1b[2J", 4);//清屏
-			write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
-			printf("level2.c程序已启动\n");
-			fflush(stdout); // 确保输出被刷新
+		
+		if (key == 1000) {
+			
+			bufferappend(&ab, "\x1b[2J", 4); // 清屏
+			bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
+			bufferappend(&ab, "level2.c程序已启动\n", 16); // 添加文本到缓冲区
+			
+			
 		}
 		else if (key == 1001) {
-			write(STDOUT_FILENO,"\x1b[A", 3);//光标移动到上方
-			fflush(stdout); // 确保输出被刷新
+			if(cy > 0) {
+				cy--; // 光标移动到上方
+			} else {
+				cy = 0; // 如果已经在第一行，则不移动
+			}
+			
 		}
 		else if (key == 1002) {
-			write(STDOUT_FILENO,"\x1b[B", 3);//光标移动到下方
-			//printf("\nDown arrow key pressed.\n");
+			if(cy < rows - 1) {
+				cy++; // 光标移动到下方
+			} else {
+				cy = rows - 1; // 如果已经在最后一行，则不移动
+			}
+
 		}
 		else if (key == 1003) {
-			write(STDOUT_FILENO,"\x1b[C", 3);//光标移动到右方
-			fflush(stdout); // 确保输出被刷新
-			
-			//printf("\nRight arrow key pressed.\n");
+			if(cx < cols - 1) {
+				cx++; // 光标移动到右方
+			} else {
+				cx = cols - 1; // 如果已经在最后一列，则不移动
+			}
+
 		}
 		else if (key == 1004) {
-			write(STDOUT_FILENO,"\x1b[D", 3);//光标移动到左方
-			fflush(stdout); // 确保输出被刷新
+			if(cx > 0) {
+				cx--; // 光标移动到左方
+			} else {
+				cx = 0; // 如果已经在第一列，则不移动
+			}
 		}
 		else if (key == 1005) {
-			write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
-			fflush(stdout); // 确保输出被刷新
+			cx = 0; // 光标移动到行首
+			cy = 0; // 光标移动到第一行
+			
+			
 		}
 		else if (key == 1006) {
-			get_window_size(&rows, &cols); // 获取窗口大小
-			write(STDOUT_FILENO,"\x1b[%dG", cols);//光标移动到行尾
-			fflush(stdout); // 确保输出被刷新
+			cx = cols - 1; // 光标移动到行尾
 		}
 		else if (key == 'q') {
+			bufferappend(&ab, "\x1b[2J", 4); // 清屏
 			break; // 如果读取到的字符是'q'，则退出
 		}
 		else {
 			//printf("\nRead character: %c\n", key); // 打印读取的字符
 		}
+		write(STDOUT_FILENO, ab.b, ab.len); // 输出缓冲区
+		free(ab.b); // 释放缓冲区
 	}
-
+	
     return 0;
 }
