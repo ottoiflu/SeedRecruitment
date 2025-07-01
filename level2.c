@@ -114,15 +114,15 @@ void scoll(){
 	// 这里可以添加滚动的实现
 	// 例如，当光标到达屏幕底部时，向上滚动一行
 	if (cy < rowoff) {
-		cy = rowoff; // 保持光标在最后一行
+		rowoff = cy; // 保持光标在最后一行
 	}
 	if (cy >= rowoff+rows) {
 		rowoff= cy - rows+1; // 向上滚动
 	}
 	if (cx < coloff) {
-		cx = coloff; // 保持光标在最后一列
+		coloff = cx; // 保持光标在最后一列
 	}
-	if (cx >=coloff+cols) {
+	if (cx >= coloff+cols) {
 		coloff = cx - cols + 1; // 向左滚动
 	}
 }
@@ -131,18 +131,21 @@ void refresh_screen() {
 	scoll(); // 调用滚动函数
 	struct appendbuffer ab = APPENDBUFFER_INIT;
 	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
-
+	bufferappend(&ab, "\x1b[3J", 4); //
 	bufferappend(&ab,"jfjdjsjdkfjfkjdkjdkjflskjdlkfjldkjslkdjfldkjslkdjl\r\n", 62);// 添加一些文本到缓冲区
 	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
+	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
+	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
+	bufferappend(&ab,"sdjdjfk\r\n", 10); // 添加一些文本到缓冲区
 
-	for (int i = 2; i < rows; i++) {
+	for (int i = 7; i < rows; i++) {
 		bufferappend(&ab, "~\r\n", 3); 
 	}
 	
 	char buf[32];
-	sprintf(buf, "\x1b[%d;%dH", cy -rowoff, cx -coloff); // 光标位置
+	sprintf(buf, "\x1b[%d;%dH", cy -rowoff+1, cx -coloff+1); // 光标位置
 	bufferappend(&ab, buf, strlen(buf)); // 添加光标位置到缓冲区
-	
+
 	write(STDOUT_FILENO, ab.b, ab.len); // 输出缓冲区内容
 	free(ab.b); // 释放缓冲区
 	// 刷新屏幕的函数
@@ -158,6 +161,7 @@ int main() {
 	struct appendbuffer ab = APPENDBUFFER_INIT;
 	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
 	bufferappend(&ab, "\x1b[2J", 4); // 清屏
+	bufferappend(&ab, "\x1b[3J", 4); //
 	bufferappend(&ab, "level2.c start\n", 16); // 添加文本到缓冲区
 	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
 	write(STDOUT_FILENO, ab.b, ab.len); // 输出缓冲区内容
@@ -188,20 +192,12 @@ int main() {
 			
 		}
 		else if (key == 1002) {
-			if(cy < rows - 1) {
 				cy++; // 光标移动到下方
-			} else {
-				cy = rows - 1; // 如果已经在最后一行，则不移动
-			}
-
+				
 		}
 		else if (key == 1003) {
-			if(cx < cols - 1) {
 				cx++; // 光标移动到右方
-			} else {
-				cx = cols - 1; // 如果已经在最后一列，则不移动
-			}
-
+				
 		}
 		else if (key == 1004) {
 			if(cx > 0) {
