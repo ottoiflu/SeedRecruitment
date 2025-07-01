@@ -7,56 +7,12 @@
 #include<string.h>
 #include<stdlib.h>
 
-struct  termios orig_termios;
-
-struct appendbuffer{
-	char *b;
-	int len;
-};
-
-#define APPENDBUFFER_INIT {NULL, 0}
+#include"buffer.h"
+#include"editor_core.h"
 
 //用于光标定位与视图偏移
 int cy = 0,cx = 0; // 光标x,y坐标
 int rowoff = 0, coloff = 0; // 行偏移和列偏移
-
-void bufferappend(struct appendbuffer *ab, const char *s, int len) {
-	char* new_buffer = realloc(ab->b, ab->len + len);
-	if (!new_buffer) {
-		perror("realloc");
-		exit(1);
-	}
-	ab->b = new_buffer;
-	memcpy(ab->b + ab->len, s, len);//将新数据复制到缓冲区的末尾
-	ab->len += len;
-}
-
-
-
-void disable_raw_mode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-}
-
-void enableRawMode() {
-  tcgetattr(STDIN_FILENO, &orig_termios);//获取当前终端设置并存储到orig_termios中
-  struct termios change = orig_termios;//存储终端的原始设置
-  printf("Entering raw mode...\n");
-  
-  change.c_lflag &= ~(ECHO);//修改本地标志字段，关闭回显功能
-  change.c_lflag &= ~(ICANON);//关闭规范模式，启用原始模式
-  change.c_lflag &= ~(ISIG);//关闭信号处理
-
-  change.c_iflag &= ~(BRKINT);//输入模式标志，关闭中断处理
-  change.c_iflag &= ~(BRKINT|INPCK|ISTRIP);//检测到输入终止条件时发送SIGINT信号、奇偶校验、裁剪掉第8比特，将所有接收到的数据裁剪为 7 比特位
-  change.c_iflag &= ~(IXON);//输出流控制
-
-  change.c_cc[VMIN] = 0; //设置最小输入字符数为0
-  change.c_cc[VTIME] = 1; //设置输入等待时间为1
-
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &change);//将修改后的传入标准输入终端
-  //tcsaflush在更改属性前刷新所有的输入输出
-
-}
 
 int get_window_size(int *rows, int *cols) {
 	struct winsize ws;
@@ -65,6 +21,7 @@ int get_window_size(int *rows, int *cols) {
 	*cols = ws.ws_col;
 	return 0; // 成功获取窗口大小，返回0
 }
+
 int cols, rows;
 int readKey() {
 	int nread ;
@@ -109,18 +66,16 @@ int readKey() {
 		return c;
 	}
 
-void scoll(){
-	// 处理滚动逻辑
-	// 这里可以添加滚动的实现
-	// 例如，当光标到达屏幕底部时，向上滚动一行
+void scroll() {
 	if (cy < rowoff) {
-		rowoff = cy; // 保持光标在最后一行
+		rowoff = cy; // 保持光标在第一行
 	}
 	if (cy >= rowoff+rows) {
 		rowoff= cy - rows+1; // 向上滚动
 	}
+
 	if (cx < coloff) {
-		coloff = cx; // 保持光标在最后一列
+		coloff = cx; // 保持光标在第一列
 	}
 	if (cx >= coloff+cols) {
 		coloff = cx - cols + 1; // 向左滚动
@@ -128,7 +83,7 @@ void scoll(){
 }
 
 void refresh_screen() {
-	scoll(); // 调用滚动函数
+	scroll(); // 调用滚动函数
 	struct appendbuffer ab = APPENDBUFFER_INIT;
 	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
 	bufferappend(&ab, "\x1b[3J", 4); //
@@ -139,7 +94,7 @@ void refresh_screen() {
 		int linelen = snprintf(line, sizeof(line), "~ line %d\r\n", filerow);
 		bufferappend(&ab, line, linelen);
 	}
-	
+
 	char buf[32];
 	sprintf(buf, "\x1b[%d;%dH", cy -rowoff+1, cx -coloff+1); // 光标位置
 	bufferappend(&ab, buf, strlen(buf)); // 添加光标位置到缓冲区
@@ -152,9 +107,14 @@ void refresh_screen() {
 
 
 int main() {
+	struct termios orig_termios;//存储终端的标准设置
+	if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) {
+		perror("tcgetattr");
+	}
     enableRawMode();
-	atexit(disable_raw_mode); // 在程序退出时恢复原始终端设置
 	
+
+
 	struct appendbuffer ab = APPENDBUFFER_INIT;
 	bufferappend(&ab, "\x1b[H", 3); // 光标移动到左上角
 	bufferappend(&ab, "\x1b[2J", 4); // 清屏
@@ -206,14 +166,13 @@ int main() {
 		else if (key == 1005) {
 			cx = 0; // 光标移动到行首
 			cy = 0; // 光标移动到第一行
-			
-			
 		}
 		else if (key == 1006) {
 			cx = cols - 1; // 光标移动到行尾
 		}
 		else if (key == 'q') {
 			bufferappend(&ab, "\x1b[2J", 4); // 清屏
+			disableRawMode(orig_termios); // 禁用原始模式
 			break; // 如果读取到的字符是'q'，则退出
 		}
 		else {

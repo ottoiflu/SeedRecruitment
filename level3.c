@@ -33,7 +33,6 @@ void enableRawMode() {
 
 }
 
-
 typedef struct erow{//行内容结构体
 	int size ;
 	char *chars; //行内容
