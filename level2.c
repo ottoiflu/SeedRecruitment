@@ -36,33 +36,20 @@ int readKey() {
 	int nread ;
 	char c;
 	//持续读取知道一个字符被读取
-	while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-		if (nread == -1 && errno != EAGAIN) {
-			perror("read");
-			return -1;
-		}
-	}
+	nread = read(STDIN_FILENO, &c, 1);
+	if(nread != 1)return -1; // 如果读取不到一个字符，返回-1
 
 	if (c == '\x1b') { // 读取到的是ESC键
-		char seq[4];
+		char seq[2];
 		// 读取接下来的两个字符
+		if (read(STDIN_FILENO, &seq[0], 1) != 1)
+			return '\x1b';
 		if (read(STDIN_FILENO, &seq[1], 1) != 1)
-			return -1;
-		if (read(STDIN_FILENO, &seq[2], 1) != 1)
-			return -1;
-		if (read(STDIN_FILENO, &seq[3], 1) != 1)
-			return -1;
+			return '\x1b';
 
 		//标准转义序列“\x1b[”开头
-		if (seq[1] == '[') {
-			//设置颜色的转义序列以及擦除功能的转义序列,这里只实现清屏
-			if(seq[2] >= '0' && seq[3] <= '9') {
-				if(seq[3]=='J'&&seq[2]=='2') {
-					
-					return 1000; // 清屏的转义序列
-				}
-			}
-			switch (seq[2]) {
+		if (seq[0] == '[') {
+			switch (seq[1]) {
 				case 'A':
 					//printf("\nUp arrow key pressed.\n");
 					return 1001;
@@ -81,20 +68,17 @@ int readKey() {
 				case 'F':
 					//printf("\nEnd key pressed.\n");
 					return 1006;
-				default:
-					printf("\nUnknown escape sequence: %s\n", seq);
 			}
-		}
-		else {
-			printf("\nUnknown escape sequence: %c%c%c\n", seq[0], seq[1], seq[2]);
 		}
 		return 0;
 	}
-	else {
-		printf("Key pressed: %c\n", c);
 		return c;
 	}
 
+void moveCursor(int x, int y) {
+	char buf[32];
+	int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", y, x);
+	write(STDOUT_FILENO, buf, len); // 将光标移动到指定位置
 }
 
 void adAppend(){
@@ -104,44 +88,47 @@ void adAppend(){
 
 int main() {
     enableRawMode();
-	printf("level2.c程序已启动\n");
-	write(STDOUT_FILENO,"\x1b[2J", 4);//清屏
+	atexit(disable_raw_mode); // 在程序退出时恢复原始终端设置
 	write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
-	
+	write(STDOUT_FILENO,"\x1b[2J", 4);//清屏
+	printf("level2.c程序已启动\n");
+	write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
+	int x = 1,y=1;
 	while (1){
 		int key = readKey();
-		if (key == -1) {
-			break; // 读取错误，退出循环
-		}
+		if (key == -1) continue;
+		
 		else if (key == 1000) {
 			write(STDOUT_FILENO,"\x1b[2J", 4);//清屏
-			write(STDIN_FILENO,"\x1b[H", 3);//光标移动到左上角
+			write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
 			printf("level2.c程序已启动\n");
-			//printf("\nUp arrow key pressed.\n");
+			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 1001) {
-			write(STDIN_FILENO,"\x1b[A", 3);//光标移动到上方
-			//printf("\nUp arrow key pressed.\n");
+			write(STDOUT_FILENO,"\x1b[A", 3);//光标移动到上方
+			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 1002) {
-			write(STDIN_FILENO,"\x1b[B", 3);//光标移动到下方
+			write(STDOUT_FILENO,"\x1b[B", 3);//光标移动到下方
 			//printf("\nDown arrow key pressed.\n");
 		}
 		else if (key == 1003) {
-			write(STDIN_FILENO,"\x1b[C", 3);//光标移动到右方
+			write(STDOUT_FILENO,"\x1b[C", 3);//光标移动到右方
+			fflush(stdout); // 确保输出被刷新
+			
 			//printf("\nRight arrow key pressed.\n");
 		}
 		else if (key == 1004) {
-			write(STDIN_FILENO,"\x1b[D", 3);//光标移动到左方
-			//printf("\nLeft arrow key pressed.\n");
+			write(STDOUT_FILENO,"\x1b[D", 3);//光标移动到左方
+			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 1005) {
-			write(STDIN_FILENO,"\x1b[H", 3);//光标移动到左上角
-			//printf("\nHome key pressed.\n");
+			write(STDOUT_FILENO,"\x1b[H", 3);//光标移动到左上角
+			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 1006) {
-			write(STDIN_FILENO,"\x1b[F", 3);//光标移动到右下角
-			//printf("\nEnd key pressed.\n");
+			write(STDOUT_FILENO,"\x1b[F", 3);//光标移动到右下角
+			fflush(stdout); // 确保输出被刷新
 		}
 		else if (key == 'q') {
 			break; // 如果读取到的字符是'q'，则退出
